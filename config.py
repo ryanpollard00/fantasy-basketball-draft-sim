@@ -1,8 +1,8 @@
 """
-Project settings for the fantasy basketball draft simulator.
+Project settings for the draft simulator.
  
-All tunable settings live here, so scoring, league format and model
-parameters can be changed in one place without editing the code.
+All default settings are in this file, so scoring, league format and model
+parameters can be changed in one place without editing any other code.
 """
 from pathlib import Path
 # ---------------------------------------------------------------------
@@ -17,12 +17,12 @@ TEST_SEASON = "2025-26"          # backtest season: projected, then scored on ac
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 DB_PATH = PROJECT_ROOT / "data" / "fantasy.db"   # SQLite database file (not committed to GitHub)
-API_PAUSE_SECONDS = 1.5          # pause between nba_api calls (stats.nba.com rate-limits)
+API_PAUSE_SECONDS = 1.5          # pause between nba_api calls (stats.nba.com has rate-limits)
 API_RETRIES = 3                  # retries if a call times out
-MIN_MINUTES = 500                # drop players with fewer season minutes than this
+MIN_MINUTES = 500                # minimum minutes in a training season for a player to be included in the model
 
 # ---------------------------------------------------------------------
-# Scoring (points league)
+# Scoring (winners are based on highest overall points)
 # Keys match the column names returned by nba_api's LeagueDashPlayerStats.
 # FG_MISS and FT_MISS are calculated: FGA - FGM and FTA - FTM.
 # W = wins in games the player played.
@@ -65,12 +65,11 @@ SLOT_ELIGIBILITY = {
     "BENCH": ALL_POSITIONS,
 }
 
-# Draft rule: a pick goes into the first open slot in this order that it fits
-# (most restrictive first, bench last).
+# Draft rule: order in which slots are filled when drafting, left to right
 SLOT_PRIORITY = ["PG", "SG", "SF", "PF", "C", "G", "F", "UTIL", "BENCH"]
 
 # The NBA's official listings only use G, F and C. This maps them to fantasy
-# positions (an approximation; see Limitations in the README).
+# positions (this is an approximation, see Limitations in the readme).
 NBA_POSITION_MAP = {
     "G": ["PG", "SG"],
     "F": ["SF", "PF"],
@@ -84,7 +83,7 @@ NBA_POSITION_MAP = {
 # ---------------------------------------------------------------------
 # Projections
 # ---------------------------------------------------------------------
-LONG_TERM_WEIGHTS = [0.5, 0.3, 0.2]   # most recent season first (strategy 2)
+LONG_TERM_WEIGHTS = [0.5, 0.3, 0.2]   # 3 season weighted average weights
 
 RF_PARAMS = {
     "n_estimators": 300,          # number of trees; their spread gives floor/ceiling

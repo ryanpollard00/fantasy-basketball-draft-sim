@@ -1,2 +1,2 @@
 # Fantasy Basketball Draft Simulator
-Projects NBA player fantasy value with machine learning and simulates 500 twelve-team drafts to test six draft strategies. Work in progress.
+Projects fantasy basketball point totals for NBA players with machine learning and uses those projections to create six different draft strategies and simulate 500 drafts of a 12-team league. Work in progress.
