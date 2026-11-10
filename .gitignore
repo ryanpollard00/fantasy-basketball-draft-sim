@@ -1,0 +1,21 @@
+# Virtual environment
+venv/
+ 
+# Database and large data files
+data/*.db
+data/*.csv
+ 
+# Python cache
+__pycache__/
+*.pyc
+ 
+# Jupyter
+.ipynb_checkpoints/
+ 
+# Editor and OS files
+.vscode/
+.DS_Store
+Thumbs.db
+ 
+# Secrets
+.env
