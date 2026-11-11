@@ -108,10 +108,11 @@ CEILING_PERCENTILE = 75
 # Draft strategy and simulation
 # ---------------------------------------------------------------------
 # VORP replacement level
-# "data":  take the top NUM_TEAMS x len(STARTING_SLOTS) players by projection (96),
-#          count how many play each position, and use the next player at that position
-# "fixed": use REPLACEMENT_RANK at every position (for the sensitivity check)
-REPLACEMENT_METHOD = "data"
+# "demand": each position's share of the league's starting slots (its own slot, plus an even
+#           split of each flexible slot it qualifies for); replacement is the next player after that
+#           for example, PG fills PG, G, and UTIL, so its replacement level will be further in the draft than C, which only fills C and UTIL
+# "fixed":  use REPLACEMENT_RANK at every position (for the sensitivity check)
+REPLACEMENT_METHOD = "demand"
 REPLACEMENT_RANK = 24            # only used when REPLACEMENT_METHOD = "fixed"
 
 N_SIMULATIONS = 500
@@ -126,4 +127,14 @@ XGB_PARAM_GRID = {
     "max_depth": [2, 3, 4],
     "learning_rate": [0.03, 0.05],
     "n_estimators": [150, 300, 600],
+}
+
+# Draft strategies: the projection each one ranks players by, and how it ranks them
+STRATEGIES = {
+    "naive_recency":   {"value": "PROJ_LAST_SEASON", "ranking": "raw"},
+    "naive_long_term": {"value": "PROJ_AVG3",        "ranking": "raw"},
+    "best_available":  {"value": "PROJ_MID",         "ranking": "raw"},
+    "vorp":            {"value": "PROJ_MID",         "ranking": "vorp"},
+    "floor":           {"value": "PROJ_FLOOR",       "ranking": "vorp"},
+    "ceiling":         {"value": "PROJ_CEILING",     "ranking": "vorp"},
 }
