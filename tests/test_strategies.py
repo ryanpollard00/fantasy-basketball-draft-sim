@@ -98,9 +98,9 @@ def test_strategy_takes_the_best_allowed_player():
     assert pick(None, allowed) == expected
 
 
-def test_six_strategy_draft_is_legal():
+def test_every_strategy_drafts_legally():
     pool = strategy_pool()
-    seats = list(config.STRATEGIES) * config.TEAMS_PER_STRATEGY
+    seats = list(config.STRATEGIES) * 2    # 12 teams, two per strategy
     teams = [Team(f"Team {i + 1}", name) for i, name in enumerate(seats)]
     picks = run_draft(teams, pool, build_strategies(pool))
     assert len(picks) == config.NUM_TEAMS * config.ROSTER_SIZE

@@ -90,24 +90,17 @@ def build_strategies(players):
 
 
 if __name__ == "__main__":
-    import numpy as np
-
-    from src.draft import Team, run_draft
     from src.model import load_projections
 
     players = load_projections()
-    rng = np.random.default_rng(config.RANDOM_SEED)
-    seats = rng.permutation(list(config.STRATEGIES) * config.TEAMS_PER_STRATEGY).tolist()
-    teams = [Team(f"Team {i + 1}", name) for i, name in enumerate(seats)]
+    players = players[players["SEASON"] == config.TEST_SEASON]
+    scores = strategy_scores(players)
+    draftable = config.NUM_TEAMS * config.ROSTER_SIZE
+    baseline_top = set(scores["best_available"].nlargest(draftable).index)
 
-    picks = run_draft(teams, players, build_strategies(players))
-    picks = picks.merge(players[["PLAYER_ID", "PLAYER_NAME", "POSITIONS"]], on="PLAYER_ID")
-
-    print("First four picks by team:")
-    for team in teams:
-        first_four = ", ".join(picks.loc[picks["TEAM"] == team.name, "PLAYER_NAME"].head(4))
-        print(f"  {team.name} ({team.strategy_name}): {first_four}")
-
-    print("\nPlayers drafted at each position, by strategy (two-position players count at both):")
-    position_mix = picks.explode("POSITIONS").groupby(["STRATEGY", "POSITIONS"]).size().unstack(fill_value=0)
-    print(position_mix[["PG", "SG", "SF", "PF", "C"]].to_string())
+    for name in config.STRATEGIES:
+        top = scores[name].nlargest(draftable).index
+        first_six = ", ".join(players.loc[top[:6], "PLAYER_NAME"])
+        shared = len(baseline_top & set(top))
+        print(f"{name}: {shared} of top {draftable} shared with best_available")
+        print(f"    first six: {first_six}")

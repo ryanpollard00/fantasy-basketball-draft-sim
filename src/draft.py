@@ -25,7 +25,8 @@ class Team:
         self.roster.append((slot, player_id))
 
     def slot_for(self, positions):
-        """The most restrictive open slot a player fits, or none if he fits none.
+        """The most restrictive open slot a player fits, or None if he fits none.
+        Bench slots only open up once every starting slot is filled.
         """
         starters_filled = all(slot == "BENCH" for slot in self.open_slots)
         for slot in config.SLOT_PRIORITY:
@@ -92,6 +93,7 @@ if __name__ == "__main__":
     from src.model import load_projections
 
     players = load_projections()
+    players = players[players["SEASON"] == config.TEST_SEASON]
     teams = [Team(f"Team {i + 1}", "test") for i in range(config.NUM_TEAMS)]
     picks = run_draft(teams, players, {"test": best_projection})
     picks = picks.merge(players[["PLAYER_ID", "PLAYER_NAME", "POSITIONS"]], on="PLAYER_ID")

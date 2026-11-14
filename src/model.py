@@ -25,9 +25,9 @@ def evaluate(actual, predicted):
     }
 
 
-def train_random_forest(train):
-    """Fit a Random Forest on the training rows using config.RF_PARAMS."""
-    model = RandomForestRegressor(**config.RF_PARAMS)
+def train_random_forest(train, params=None):
+    """Fit a Random Forest on the training rows (config.RF_PARAMS unless params are given)."""
+    model = RandomForestRegressor(**(params or config.RF_PARAMS))
     model.fit(train[MODEL_FEATURES], train[TARGET])
     return model
 
@@ -41,7 +41,7 @@ def train_xgboost(train):
 
 def season_splits(train):
     """Expanding-window splits: fit on earlier training seasons, validate on the next one."""
-    seasons = config.TRAIN_TARGET_SEASONS
+    seasons = sorted(train["SEASON"].unique())
     splits = []
     for i in range(1, len(seasons)):
         fit_rows = np.flatnonzero(train["SEASON"].isin(seasons[:i]))
@@ -106,7 +106,7 @@ def range_coverage(actual, ranges):
     return actual.between(ranges["PROJ_FLOOR"], ranges["PROJ_CEILING"]).mean()
 
 
-def calibrate_range_factor(train):
+def calibrate_range_factor(train, params=None):
     """Find the stretch factor that makes floor-to-ceiling ranges hold the intended share of results.
 
     Uses the same season splits as tuning: fit on earlier training seasons, project the
@@ -116,7 +116,7 @@ def calibrate_range_factor(train):
     target_coverage = (config.CEILING_PERCENTILE - config.FLOOR_PERCENTILE) / 100
     actuals, ranges = [], []
     for fit_rows, validation_rows in season_splits(train):
-        rf = train_random_forest(train.iloc[fit_rows])
+        rf = train_random_forest(train.iloc[fit_rows], params)
         validation = train.iloc[validation_rows]
         actuals.append(validation[TARGET])
         ranges.append(project_with_range(rf, validation))
@@ -128,19 +128,40 @@ def calibrate_range_factor(train):
     return float(factors[np.argmin(np.abs(coverages - target_coverage))])
 
 
-def build_projections():
-    """Train on the training seasons and project every player in the test season.
+def build_projections(season=None):
+    """Project every player in one backtest season, using only earlier seasons.
 
-    One row per player in the draft pool: positions, the two naive projections
-    (strategies 1 and 2), the calibrated floor, middle and ceiling (strategies 3-6),
-    and actual points, which are used only to score teams after the draft.
+    Tuning and floor/ceiling calibration are redone on that season's training rows, so
+    nothing from the backtest season or later can warp its projections. Returns the
+    projections and a description of how they were made.
     """
-    train, test = split_by_season(build_model_table())
-    rf = train_random_forest(train)
-    ranges = scale_range(project_with_range(rf, test), calibrate_range_factor(train))
-    projections = test[["PLAYER_ID", "PLAYER_NAME", "POSITIONS", "FANTASY_PTS_LAG1", "FANTASY_PTS_AVG3"]].join(ranges)
+    season = season or config.TEST_SEASON
+    train, test = split_by_season(build_model_table(), season)
+    search = tune_random_forest(train)
+    params = {**config.RF_PARAMS, **search.best_params_}
+    rf = search.best_estimator_
+    range_factor = calibrate_range_factor(train, params)
+
+    ranges = scale_range(project_with_range(rf, test), range_factor)
+    projections = test[["PLAYER_ID", "PLAYER_NAME", "SEASON", "POSITIONS", "FANTASY_PTS_LAG1", "FANTASY_PTS_AVG3"]].join(ranges)
     projections["ACTUAL_PTS"] = test[TARGET]
-    return projections.rename(columns={"FANTASY_PTS_LAG1": "PROJ_LAST_SEASON", "FANTASY_PTS_AVG3": "PROJ_AVG3"})
+    projections = projections.rename(columns={"FANTASY_PTS_LAG1": "PROJ_LAST_SEASON", "FANTASY_PTS_AVG3": "PROJ_AVG3"})
+
+    details = {
+        "season": season,
+        "training_seasons": sorted(train["SEASON"].unique()),
+        "best_params": search.best_params_,
+        "range_factor": range_factor,
+    }
+    return projections, details
+
+
+def build_all_projections():
+    """Projections for every season in config.BACKTEST_SEASONS, combined into one table."""
+    results = [build_projections(season) for season in config.BACKTEST_SEASONS]
+    projections = pd.concat([projections for projections, _ in results], ignore_index=True)
+    details = [details for _, details in results]
+    return projections, details
 
 
 def save_projections(projections, db_path=None):
@@ -162,8 +183,15 @@ def load_projections(db_path=None):
 
 
 if __name__ == "__main__":
-    projections = build_projections()
+    projections, all_details = build_all_projections()
     save_projections(projections)
-    print(f"Saved {len(projections)} projections for {config.TEST_SEASON}\n")
-    columns = ["PLAYER_NAME", "POSITIONS", "PROJ_LAST_SEASON", "PROJ_AVG3", "PROJ_FLOOR", "PROJ_MID", "PROJ_CEILING"]
-    print(projections.nlargest(10, "PROJ_MID")[columns].round(0).to_string(index=False))
+    print(f"Saved {len(projections)} projections for {len(all_details)} backtest seasons\n")
+
+    for details in all_details:
+        season_rows = projections[projections["SEASON"] == details["season"]]
+        model_mae = evaluate(season_rows["ACTUAL_PTS"], season_rows["PROJ_MID"])["MAE"]
+        baseline_mae = evaluate(season_rows["ACTUAL_PTS"], season_rows["PROJ_LAST_SEASON"])["MAE"]
+        coverage = range_coverage(season_rows["ACTUAL_PTS"], season_rows)
+        print(f"{details['season']}: trained on {', '.join(details['training_seasons'])}")
+        print(f"    {len(season_rows)} players | best settings {details['best_params']} | stretch factor {details['range_factor']:.2f}")
+        print(f"    MAE: model {model_mae:,.0f} vs. last season {baseline_mae:,.0f} | floor-to-ceiling coverage {coverage:.0%}")

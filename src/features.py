@@ -121,10 +121,16 @@ def build_model_table(base=None):
     return df[ID_COLUMNS + MODEL_FEATURES + BASELINE_COLUMNS + [TARGET]].reset_index(drop=True)
 
 
-def split_by_season(model_table):
-    """Split rows into the training seasons and the held-out test season."""
-    train = model_table[model_table["SEASON"].isin(config.TRAIN_TARGET_SEASONS)].reset_index(drop=True)
-    test = model_table[model_table["SEASON"] == config.TEST_SEASON].reset_index(drop=True)
+def split_by_season(model_table, test_season=None):
+    """Split rows into a test season and the training rows from every earlier season.
+
+    test_season defaults to config.TEST_SEASON. Training rows never come from the test
+    season or anything after it.
+    """
+    test_season = test_season or config.TEST_SEASON
+    earlier_seasons = config.SEASONS[:config.SEASONS.index(test_season)]
+    train = model_table[model_table["SEASON"].isin(earlier_seasons)].reset_index(drop=True)
+    test = model_table[model_table["SEASON"] == test_season].reset_index(drop=True)
     return train, test
 
 if __name__ == "__main__":

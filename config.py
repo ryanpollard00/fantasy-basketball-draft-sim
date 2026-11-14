@@ -13,13 +13,14 @@ SEASONS = [
     "2022-23", "2023-24", "2024-25", "2025-26",
 ]
 TRAIN_TARGET_SEASONS = ["2021-22", "2022-23", "2023-24", "2024-25"]
-TEST_SEASON = "2025-26"          # backtest season: projected, then scored on actual results
+TEST_SEASON = "2025-26"          # default season for single-season analysis (as done in the notebooks)
+BACKTEST_SEASONS = ["2023-24", "2024-25", "2025-26"]   # walk-forward backtest: each projected from earlier seasons only
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 DB_PATH = PROJECT_ROOT / "data" / "fantasy.db"   # SQLite database file (not committed to GitHub)
 API_PAUSE_SECONDS = 1.5          # pause between nba_api calls (stats.nba.com has rate-limits)
 API_RETRIES = 3                  # retries if a call times out
-MIN_MINUTES = 500                # minimum minutes in a training season for a player to be included in the model
+MIN_MINUTES = 500                # minimum minutes last season for a player to be included in the model table
 
 # ---------------------------------------------------------------------
 # Scoring (winners are based on highest overall points)
@@ -46,7 +47,6 @@ SCORING = {
 # League and roster
 # ---------------------------------------------------------------------
 NUM_TEAMS = 12
-TEAMS_PER_STRATEGY = 2           # 6 strategies x 2 = 12 teams
 
 STARTING_SLOTS = ["PG", "SG", "SF", "PF", "C", "G", "F", "UTIL"]
 BENCH_SLOTS = 4
@@ -115,7 +115,10 @@ CEILING_PERCENTILE = 75
 REPLACEMENT_METHOD = "demand"
 REPLACEMENT_RANK = 24            # only used when REPLACEMENT_METHOD = "fixed"
 
-N_SIMULATIONS = 500
+# Simulation: each strategy drafts as one team against 11 human-like opponents (the "field")
+N_SIMULATIONS = 240                # leagues per season; 20 per draft seat
+FIELD_VALUE = "PROJ_LAST_SEASON"   # what the field ranks players by
+FIELD_NOISE = 0.10                 # each opponent's random disagreement (standard deviation, 10%)
 RANDOM_SEED = 42
 
 # Hyperparameter search grids (time-based cross-validation on the training seasons)
